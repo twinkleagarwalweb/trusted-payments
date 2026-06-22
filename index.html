@@ -183,30 +183,17 @@ async function syncToSheets(){
   if(btn){btn.disabled=true;btn.textContent="⏳ Syncing…"}
   try{
     const rows=unsynced.map(ivToRow);
-    // Use hidden form + iframe to bypass CORS entirely
-    await new Promise((resolve,reject)=>{
-      const iframe=document.createElement("iframe");
-      iframe.name="sync_frame_"+Date.now();
-      iframe.style.display="none";
-      document.body.appendChild(iframe);
-      const form=document.createElement("form");
-      form.method="POST";
-      form.action=url;
-      form.target=iframe.name;
-      const input=document.createElement("input");
-      input.type="hidden";input.name="payload";
-      input.value=JSON.stringify({rows});
-      form.appendChild(input);
-      document.body.appendChild(form);
-      let done=false;
-      iframe.onload=()=>{if(!done){done=true;cleanup();resolve()}};
-      const timeout=setTimeout(()=>{if(!done){done=true;cleanup();resolve()}},8000);
-      function cleanup(){clearTimeout(timeout);setTimeout(()=>{try{document.body.removeChild(form);document.body.removeChild(iframe)}catch{}},500)}
-      form.submit();
-    });
-    unsynced.forEach(iv=>{iv.synced=true;save(iv)});
+    const body=JSON.stringify({rows});
+    // text/plain avoids CORS preflight — data is sent even if response is blocked
+    let confirmed=false;
+    try{
+      const resp=await fetch(url,{method:"POST",body:body,headers:{"Content-Type":"text/plain;charset=utf-8"},redirect:"follow"});
+      const txt=await resp.text();
+      if(txt.includes("ok"))confirmed=true;
+    }catch(e){/* CORS may block reading response — but data was likely sent */}
+    unsynced.forEach(iv=>{iv.synced=true;iv.syncedAt=new Date().toISOString();save(iv)});
     interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
-    toast("✓ "+unsynced.length+" interview(s) sent — check your Google Sheet");
+    toast(confirmed?"✓ "+unsynced.length+" interview(s) synced to Google Sheets":"✓ Sent — open your Google Sheet to verify");
     render();
   }catch(e){
     toast("✕ Sync failed — check your network connection");
@@ -217,9 +204,9 @@ async function syncToSheets(){
 // ─── APPS SCRIPT CODE ─────────────────────────────────────────────────────
 const APPS_SCRIPT_CODE=`function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var payload = e.parameter.payload;
-  if (!payload) return ContentService.createTextOutput("no payload");
-  var data = JSON.parse(payload);
+  var raw = e.postData.contents;
+  if (!raw) return ContentService.createTextOutput("no data");
+  var data = JSON.parse(raw);
   var rows = data.rows;
   if (!rows || rows.length === 0) return ContentService.createTextOutput("empty");
   if (sheet.getLastRow() === 0) {
@@ -283,7 +270,7 @@ async function startRec(){
       render();
     };
     mr.start(1000);recording=true;recSec=0;
-    recTimer=setInterval(()=>{recSec++;render()},1000);
+    recTimer=setInterval(()=>{recSec++;const el=document.getElementById("rec-timer");if(el)el.textContent="Recording — "+fmtDur(recSec)},1000);
     render();
   }catch(e){
     if(e.name==="NotAllowedError")alert("Microphone access denied. Check browser settings and allow microphone for this site.");
@@ -313,12 +300,13 @@ function openIV(id){
   go(cur.status==="done"?"report":"interview",0);
 }
 function finishIV(){
-  cur.completedAt=new Date().toISOString();cur.status="done";
+  cur.completedAt=new Date().toISOString();cur.status="done";cur.synced=false;
   save(cur);interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
   go("report");
 }
 function upd(path,val){
   if(path.includes(".")){const[s,f]=path.split(".");cur[s][f]=val}else{cur[path]=val}
+  cur.synced=false; // mark as needing re-sync
   clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(cur),800);
 }
 function exportAll(){
@@ -326,6 +314,13 @@ function exportAll(){
     interviews:interviews.map(iv=>({...iv,_labels:{payWait:rl(iv.q3?.range),employers:rl(iv.q2?.count),workDays:rl(iv.q6?.days),gaps:rl(iv.q7?.gaps),expectedVsActual:rl(iv.q9?.knowledge),reReg:rl(iv.q10?.resubmit),proof:rl(iv.q11?.proof),portable:rl(iv.q13?.useful),failure:rl(iv.q5?.result),age:rl(iv.s0?.age),exp:rl(iv.s0?.exp)}}))};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   triggerDownload(blob,`tp_export_${Date.now()}.json`);
+}
+function resetSyncFlags(){
+  const idx=JSON.parse(localStorage.getItem("tp_idx")||"[]");
+  idx.forEach(id=>{try{const iv=JSON.parse(localStorage.getItem("tp_"+id));iv.synced=false;localStorage.setItem("tp_"+id,JSON.stringify(iv))}catch{}});
+  interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+  toast("✓ All interviews marked as un-synced");
+  render();
 }
 
 // ─── REPORT BUILDER ───────────────────────────────────────────────────────
@@ -481,7 +476,7 @@ function renderInterview(el){
     else if(recording) btns=`<button class="btn-sm btn-gray" onclick="stopRec()">⏹ Stop</button>`;
     else if(audioBlob&&!recording) btns=`<button class="btn-sm" style="background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green)" onclick="dlAudio()">⬇ Download again</button>`;
     audioHTML=`<div class="rec-box" style="background:var(--bg2);border:${bord}">
-      <div style="display:flex;align-items:center;gap:8px">${recording?'<span class="rec-dot"></span>':""}<span style="font-size:13px;font-weight:500;color:${col}">${label}</span></div>
+      <div style="display:flex;align-items:center;gap:8px">${recording?'<span class="rec-dot"></span>':""}<span id="rec-timer" style="font-size:13px;font-weight:500;color:${col}">${label}</span></div>
       <div style="display:flex;gap:6px;flex-shrink:0">${btns}</div></div>`;
     if(hasBackup&&!audioBlob){
       audioHTML+=`<div style="background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--amber);display:flex;justify-content:space-between;align-items:center">
@@ -591,6 +586,12 @@ function renderSettings(el){
     <div class="card">
       <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">📡 Offline mode</div>
       <p style="font-size:12px;color:var(--txt2);line-height:1.6">Text data and radio selections are saved in localStorage — they work fully offline, no internet needed. Audio recording also works offline. Only the Google Sheets sync requires internet.</p>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">🔧 Tools</div>
+      <button onclick="resetSyncFlags()" class="btn btn-gray" style="font-size:13px;margin-bottom:8px">↻ Reset all sync flags (re-send everything)</button>
+      <p style="font-size:11px;color:var(--txt3);line-height:1.5">Marks all interviews as un-synced so they'll be sent again on next sync. Use this if data didn't appear in your Google Sheet.</p>
     </div>`;
 }
 
