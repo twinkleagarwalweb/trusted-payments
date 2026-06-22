@@ -183,17 +183,36 @@ async function syncToSheets(){
   if(btn){btn.disabled=true;btn.textContent="⏳ Syncing…"}
   try{
     const rows=unsynced.map(ivToRow);
-    const resp=await fetch(url,{method:"POST",body:JSON.stringify({rows}),headers:{"Content-Type":"text/plain"}});
-    if(!resp.ok)throw new Error("HTTP "+resp.status);
+    await fetch(url,{method:"POST",body:JSON.stringify({rows}),mode:"no-cors"});
+    // no-cors means we can't read the response, but the data reaches Google
     unsynced.forEach(iv=>{iv.synced=true;save(iv)});
     interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
-    toast("✓ "+unsynced.length+" interview(s) synced to Google Sheets");
+    toast("✓ "+unsynced.length+" interview(s) sent to Google Sheets — verify in your spreadsheet");
     render();
   }catch(e){
-    toast("✕ Sync failed — check your URL and network");
+    toast("✕ Sync failed — check your network connection");
     if(btn){btn.disabled=false;btn.textContent="☁ Sync to Google Sheets"}
   }
 }
+
+// ─── APPS SCRIPT CODE ─────────────────────────────────────────────────────
+const APPS_SCRIPT_CODE=`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  var rows = data.rows;
+  if (!rows || rows.length === 0) return ContentService.createTextOutput(JSON.stringify({status:"empty"})).setMimeType(ContentService.MimeType.JSON);
+  if (sheet.getLastRow() === 0) {
+    var headers = Object.keys(rows[0]);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+  }
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  rows.forEach(function(row) {
+    var vals = headers.map(function(h) { return row[h] || ""; });
+    sheet.appendRow(vals);
+  });
+  return ContentService.createTextOutput(JSON.stringify({status:"ok",added:rows.length})).setMimeType(ContentService.MimeType.JSON);
+}`;
 
 // ─── LABELS & FORMAT ──────────────────────────────────────────────────────
 const RL={"<1w":"Within 1 week","1-2w":"1–2 weeks","2-4w":"2–4 weeks","1-3m":"1–3 months",">3m":">3 months","none":"Not received","<10":"<10 days","10-20":"10–20 days","21-40":"21–40 days","41-60":"41–60 days",">60":">60 days","1":"1 employer","2-3":"2–3 employers","4+":"4+ employers","unsure":"Unsure","rare":"Rare — usually have work","short":"Short (<1 month)","common":"Common, can last months","supplement":"Not main income","under25":"Under 25","25-35":"25–35","36-45":"36–45","above45":"Above 45","<1":"<1 year","1-3":"1–3 years","3-5":"3–5 years",">5":">5 years","yes":"Yes","no":"No","cant-recall":"Can't recall","always":"Always from scratch","sometimes":"Sometimes","no-r":"No, already there","unsure-r":"Unsure","knew-matched":"Knew in advance, matched","rough":"Had rough idea","didnt-know":"Did not know","different":"Was different","paper":"Paper or card","phone":"On phone","nothing":"Nothing","unsure-p":"Unsure","very":"Very useful","somewhat":"Somewhat useful","unsure-u":"Not sure","no-need":"Not needed"};
@@ -390,7 +409,7 @@ function render(){
   if(view==="home")renderHome(app);
   else if(view==="interview")renderInterview(app);
   else if(view==="report")renderReport(app);
-  else if(view==="settings")renderSettings(app);
+  else if(view==="settings"){renderSettings(app);const sc=document.getElementById("script-code");if(sc)sc.textContent=APPS_SCRIPT_CODE;}
 }
 
 function renderHome(el){
@@ -522,7 +541,7 @@ function renderSettings(el){
 
     <div class="card">
       <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">Apps Script code (copy this)</div>
-      <pre style="font-family:monospace;font-size:11px;background:var(--bg);padding:12px;border-radius:var(--r);overflow-x:auto;white-space:pre-wrap;line-height:1.6;color:var(--txt2)">${h(`function doPost(e) {
+      <pre id="script-code" style="font-family:monospace;font-size:11px;background:var(--bg);padding:12px;border-radius:var(--r);overflow-x:auto;white-space:pre-wrap;line-height:1.6;color:var(--txt2)">${h(`function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var data = JSON.parse(e.postData.contents);
   var rows = data.rows;
@@ -540,7 +559,7 @@ function renderSettings(el){
   });
   return ContentService.createTextOutput(JSON.stringify({status:"ok",added:rows.length})).setMimeType(ContentService.MimeType.JSON);
 }`)}</pre>
-      <button onclick="navigator.clipboard.writeText(document.querySelector('.card pre').textContent);toast('✓ Script copied')" class="btn btn-gray" style="margin-top:8px;font-size:13px">📋 Copy script</button>
+      <button onclick="navigator.clipboard.writeText(APPS_SCRIPT_CODE);toast('✓ Script copied')" class="btn btn-gray" style="margin-top:8px;font-size:13px">📋 Copy script</button>
     </div>
 
     <div class="card">
