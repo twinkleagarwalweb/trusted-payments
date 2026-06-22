@@ -70,8 +70,8 @@ textarea{line-height:1.6}
 .report-pre{font-family:'Courier New',Courier,monospace;font-size:11px;color:var(--txt);line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow-y:auto}
 
 .back-btn{background:none;border:none;color:var(--txt2);font-size:13px;padding:0 0 12px;display:flex;align-items:center;gap:4px}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--txt);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s}
-.toast.show{opacity:1}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--txt);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1;pointer-events:auto}
 
 [hidden]{display:none!important}
 </style>
