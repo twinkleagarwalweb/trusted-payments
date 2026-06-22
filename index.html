@@ -15,6 +15,7 @@
   --green:#166534;--green-bg:#f0fdf4;--green-bd:#86efac;
   --amber:#92400e;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
   --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --purple:#7c3aed;--purple-bg:#f5f3ff;--purple-bd:#c4b5fd;
   --r:8px;--rl:12px;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
@@ -22,13 +23,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);line-height:1
 .wrap{max-width:480px;margin:0 auto;padding:16px}
 h2{font-size:18px;font-weight:600}
 button{font-family:var(--font);cursor:pointer}
-textarea,input[type=text]{font-family:var(--font);font-size:14px;color:var(--txt);width:100%;padding:10px 12px;border-radius:var(--r);border:1px solid var(--bg3);background:var(--bg2);outline:none;-webkit-appearance:none;resize:vertical}
-textarea:focus,input[type=text]:focus{border-color:var(--blue-bd)}
+textarea,input[type=text],input[type=url]{font-family:var(--font);font-size:14px;color:var(--txt);width:100%;padding:10px 12px;border-radius:var(--r);border:1px solid var(--bg3);background:var(--bg2);outline:none;-webkit-appearance:none;resize:vertical}
+textarea:focus,input[type=text]:focus,input[type=url]:focus{border-color:var(--blue-bd)}
 textarea{line-height:1.6}
 
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:var(--rl);font-size:15px;font-weight:500;border:none}
 .btn-blue{background:var(--blue-bg);border:1.5px solid var(--blue-bd);color:var(--blue)}
 .btn-green{background:var(--green-bg);border:1.5px solid var(--green-bd);color:var(--green)}
+.btn-purple{background:var(--purple-bg);border:1.5px solid var(--purple-bd);color:var(--purple)}
 .btn-gray{background:var(--bg3);border:1px solid var(--bg3);color:var(--txt2)}
 .btn-sm{padding:10px 14px;font-size:13px;width:auto;flex:1}
 
@@ -51,6 +53,7 @@ textarea{line-height:1.6}
 .badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;display:inline-block}
 .badge-done{background:var(--green-bg);color:var(--green)}
 .badge-draft{background:var(--amber-bg);color:var(--amber)}
+.badge-synced{background:var(--purple-bg);color:var(--purple);margin-left:4px}
 
 .nav-row{display:flex;gap:10px;margin-top:8px}
 .nav-btn{flex:1;padding:12px;border-radius:var(--r);font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px;border:none}
@@ -67,17 +70,26 @@ textarea{line-height:1.6}
 .report-pre{font-family:'Courier New',Courier,monospace;font-size:11px;color:var(--txt);line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow-y:auto}
 
 .back-btn{background:none;border:none;color:var(--txt2);font-size:13px;padding:0 0 12px;display:flex;align-items:center;gap:4px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--txt);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
 
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
 
 <script>
-// ─── STORAGE ──────────────────────────────────────────────────────────────
+// ─── TOAST ────────────────────────────────────────────────────────────────
+function toast(msg,ms=2500){
+  const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),ms);
+}
+
+// ─── LOCALSTORAGE ─────────────────────────────────────────────────────────
 function getAll(){
-  try{ const idx=JSON.parse(localStorage.getItem("tp_idx")||"[]"); return idx.map(id=>{try{return JSON.parse(localStorage.getItem("tp_"+id))}catch{return null}}).filter(Boolean) }catch{return[]}
+  try{const idx=JSON.parse(localStorage.getItem("tp_idx")||"[]");return idx.map(id=>{try{return JSON.parse(localStorage.getItem("tp_"+id))}catch{return null}}).filter(Boolean)}catch{return[]}
 }
 function save(iv){
   localStorage.setItem("tp_"+iv.id,JSON.stringify(iv));
@@ -86,28 +98,125 @@ function save(iv){
   localStorage.setItem("tp_idx",JSON.stringify(idx));
 }
 function newIV(){
-  return{id:""+Date.now(),startedAt:new Date().toISOString(),completedAt:null,status:"draft",audioRef:"",
+  return{id:""+Date.now(),startedAt:new Date().toISOString(),completedAt:null,status:"draft",audioRef:"",synced:false,
     s0:{role:"",programme:"",org:"",location:"",age:"",exp:"",notes:""},
     q1:{types:""},q2:{count:"",names:""},q3:{range:"",exact:""},q4:{impact:""},q5:{result:"",details:""},
     q6:{days:"",details:""},q7:{gaps:"",management:""},q8:{method:""},q9:{knowledge:"",mismatch:""},
     q10:{resubmit:"",what:""},q11:{proof:"",desc:""},q12:{wish:""},q13:{useful:"",reason:""},q14:{extra:""}}
 }
 
+// ─── INDEXEDDB (audio backup) ─────────────────────────────────────────────
+let audioDB=null;
+function openAudioDB(){
+  return new Promise((res,rej)=>{
+    if(audioDB)return res(audioDB);
+    const req=indexedDB.open("tp_audio_db",1);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore("audio",{keyPath:"id"})};
+    req.onsuccess=e=>{audioDB=e.target.result;res(audioDB)};
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function saveAudioToDB(ivId,blob,ext){
+  try{
+    const db=await openAudioDB();
+    const tx=db.transaction("audio","readwrite");
+    tx.objectStore("audio").put({id:ivId,blob,ext,savedAt:new Date().toISOString()});
+  }catch(e){console.error("IndexedDB save failed:",e)}
+}
+async function getAudioFromDB(ivId){
+  try{
+    const db=await openAudioDB();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction("audio","readonly");
+      const req=tx.objectStore("audio").get(ivId);
+      req.onsuccess=()=>res(req.result||null);
+      req.onerror=()=>res(null);
+    });
+  }catch{return null}
+}
+async function deleteAudioFromDB(ivId){
+  try{const db=await openAudioDB();db.transaction("audio","readwrite").objectStore("audio").delete(ivId)}catch{}
+}
+async function getAllAudioKeys(){
+  try{
+    const db=await openAudioDB();
+    return new Promise((res)=>{
+      const tx=db.transaction("audio","readonly");
+      const req=tx.objectStore("audio").getAllKeys();
+      req.onsuccess=()=>res(req.result||[]);
+      req.onerror=()=>res([]);
+    });
+  }catch{return[]}
+}
+
+// ─── GOOGLE SHEETS SYNC ──────────────────────────────────────────────────
+function getSheetsURL(){return localStorage.getItem("tp_sheets_url")||""}
+function setSheetsURL(url){localStorage.setItem("tp_sheets_url",url)}
+
+function ivToRow(iv){
+  return{
+    id:iv.id,started:iv.startedAt,completed:iv.completedAt||"",status:iv.status,audioRef:iv.audioRef||"",
+    role:iv.s0?.role||"",programme:iv.s0?.programme||"",org:iv.s0?.org||"",location:iv.s0?.location||"",
+    age:rl(iv.s0?.age),experience:rl(iv.s0?.exp),s0_notes:iv.s0?.notes||"",
+    q1_types:iv.q1?.types||"",
+    q2_employers:rl(iv.q2?.count),q2_names:iv.q2?.names||"",
+    q3_payWait:rl(iv.q3?.range),q3_exact:iv.q3?.exact||"",
+    q4_impact:iv.q4?.impact||"",
+    q5_failure:rl(iv.q5?.result),q5_details:iv.q5?.details||"",
+    q6_workDays:rl(iv.q6?.days),q6_details:iv.q6?.details||"",
+    q7_gaps:rl(iv.q7?.gaps),q7_management:iv.q7?.management||"",
+    q8_method:iv.q8?.method||"",
+    q9_expected:rl(iv.q9?.knowledge),q9_mismatch:iv.q9?.mismatch||"",
+    q10_resubmit:rl(iv.q10?.resubmit),q10_what:iv.q10?.what||"",
+    q11_proof:rl(iv.q11?.proof),q11_desc:iv.q11?.desc||"",
+    q12_wish:iv.q12?.wish||"",
+    q13_portable:rl(iv.q13?.useful),q13_reason:iv.q13?.reason||"",
+    q14_extra:iv.q14?.extra||""
+  };
+}
+async function syncToSheets(){
+  const url=getSheetsURL();
+  if(!url){toast("⚠ Set your Google Sheets URL in Settings first");go("settings");return}
+  const unsynced=interviews.filter(iv=>!iv.synced);
+  if(unsynced.length===0){toast("✓ All interviews already synced");return}
+  const btn=document.getElementById("sync-btn");
+  if(btn){btn.disabled=true;btn.textContent="⏳ Syncing…"}
+  try{
+    const rows=unsynced.map(ivToRow);
+    const resp=await fetch(url,{method:"POST",body:JSON.stringify({rows}),headers:{"Content-Type":"text/plain"}});
+    if(!resp.ok)throw new Error("HTTP "+resp.status);
+    unsynced.forEach(iv=>{iv.synced=true;save(iv)});
+    interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+    toast("✓ "+unsynced.length+" interview(s) synced to Google Sheets");
+    render();
+  }catch(e){
+    toast("✕ Sync failed — check your URL and network");
+    if(btn){btn.disabled=false;btn.textContent="☁ Sync to Google Sheets"}
+  }
+}
+
+// ─── LABELS & FORMAT ──────────────────────────────────────────────────────
 const RL={"<1w":"Within 1 week","1-2w":"1–2 weeks","2-4w":"2–4 weeks","1-3m":"1–3 months",">3m":">3 months","none":"Not received","<10":"<10 days","10-20":"10–20 days","21-40":"21–40 days","41-60":"41–60 days",">60":">60 days","1":"1 employer","2-3":"2–3 employers","4+":"4+ employers","unsure":"Unsure","rare":"Rare — usually have work","short":"Short (<1 month)","common":"Common, can last months","supplement":"Not main income","under25":"Under 25","25-35":"25–35","36-45":"36–45","above45":"Above 45","<1":"<1 year","1-3":"1–3 years","3-5":"3–5 years",">5":">5 years","yes":"Yes","no":"No","cant-recall":"Can't recall","always":"Always from scratch","sometimes":"Sometimes","no-r":"No, already there","unsure-r":"Unsure","knew-matched":"Knew in advance, matched","rough":"Had rough idea","didnt-know":"Did not know","different":"Was different","paper":"Paper or card","phone":"On phone","nothing":"Nothing","unsure-p":"Unsure","very":"Very useful","somewhat":"Somewhat useful","unsure-u":"Not sure","no-need":"Not needed"};
 const rl=v=>RL[v]||v||"—";
 const SECS=["Snapshot","Opening","Payment","Work","Tracking","Records","Wishes"];
-
 function fmtDate(iso){return iso?new Date(iso).toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}
 function fmtDur(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 
 // ─── STATE ────────────────────────────────────────────────────────────────
-let view="home", interviews=[], cur=null, sec=0, consent=null;
-let recording=false, recSec=0, audioBlob=null, audioExt="webm";
-let mr=null, chunks=[], recTimer=null, saveTimer=null;
+let view="home",interviews=[],cur=null,sec=0,consent=null;
+let recording=false,recSec=0,audioBlob=null,audioExt="webm";
+let mr=null,chunks=[],recTimer=null,saveTimer=null;
+let audioKeys=[];
 
-function go(v,s){view=v; if(typeof s==="number")sec=s; render();}
+function go(v,s){view=v;if(typeof s==="number")sec=s;render()}
 
-// ─── AUDIO ────────────────────────────────────────────────────────────────
+// ─── AUDIO RECORDING ─────────────────────────────────────────────────────
+function triggerDownload(blob,name){
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},100);
+}
+
 async function startRec(){
   if(typeof MediaRecorder==="undefined"){alert("Audio recording not available in this browser.");return}
   try{
@@ -117,10 +226,20 @@ async function startRec(){
     let mime="";for(const t of types){if(t===""||MediaRecorder.isTypeSupported(t)){mime=t;break}}
     mr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
     mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data)};
-    mr.onstop=()=>{
+    mr.onstop=async()=>{
       audioExt=mime.includes("mp4")?"m4a":mime.includes("ogg")?"ogg":"webm";
       audioBlob=new Blob(chunks,{type:mime||"audio/webm"});
       stream.getTracks().forEach(t=>t.stop());
+      // Auto-download
+      const fname=`interview_${cur?.id||"audio"}.${audioExt}`;
+      triggerDownload(audioBlob,fname);
+      // Save to IndexedDB backup
+      if(cur){
+        await saveAudioToDB(cur.id,audioBlob,audioExt);
+        audioKeys=await getAllAudioKeys();
+        cur.audioRef=fname;save(cur);
+      }
+      toast("✓ Audio saved — file downloaded + backed up");
       render();
     };
     mr.start(1000);recording=true;recSec=0;
@@ -131,11 +250,16 @@ async function startRec(){
     else alert("Mic error: "+e.message);
   }
 }
-function stopRec(){if(mr)mr.stop();recording=false;clearInterval(recTimer);render();}
+function stopRec(){if(mr)mr.stop();recording=false;clearInterval(recTimer);render()}
 function dlAudio(){
   if(!audioBlob)return;
-  const url=URL.createObjectURL(audioBlob);const a=document.createElement("a");
-  a.href=url;a.download=`interview_${cur?.id||"audio"}.${audioExt}`;a.click();URL.revokeObjectURL(url);
+  triggerDownload(audioBlob,`interview_${cur?.id||"audio"}.${audioExt}`);
+}
+async function recoverAudio(ivId){
+  const rec=await getAudioFromDB(ivId);
+  if(!rec){toast("No audio backup found");return}
+  triggerDownload(rec.blob,`interview_${ivId}.${rec.ext}`);
+  toast("✓ Audio recovered from backup");
 }
 
 // ─── ACTIONS ──────────────────────────────────────────────────────────────
@@ -161,8 +285,7 @@ function exportAll(){
   const data={exportedAt:new Date().toISOString(),project:"Trusted Payments — eGov Foundation",total:interviews.length,
     interviews:interviews.map(iv=>({...iv,_labels:{payWait:rl(iv.q3?.range),employers:rl(iv.q2?.count),workDays:rl(iv.q6?.days),gaps:rl(iv.q7?.gaps),expectedVsActual:rl(iv.q9?.knowledge),reReg:rl(iv.q10?.resubmit),proof:rl(iv.q11?.proof),portable:rl(iv.q13?.useful),failure:rl(iv.q5?.result),age:rl(iv.s0?.age),exp:rl(iv.s0?.exp)}}))};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);const a=document.createElement("a");
-  a.href=url;a.download=`tp_export_${Date.now()}.json`;a.click();URL.revokeObjectURL(url);
+  triggerDownload(blob,`tp_export_${Date.now()}.json`);
 }
 
 // ─── REPORT BUILDER ───────────────────────────────────────────────────────
@@ -198,23 +321,14 @@ function buildReport(iv){
 
 // ─── HTML BUILDERS ────────────────────────────────────────────────────────
 const h=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-
 function radioHTML(name,opts,val){
-  return`<div class="radio-group">${opts.map(([v,l])=>
-    `<label class="radio-opt${val===v?" selected":""}"><input type="radio" name="${name}" value="${h(v)}"${val===v?" checked":""}>${h(l)}</label>`
-  ).join("")}</div>`;
+  return`<div class="radio-group">${opts.map(([v,l])=>`<label class="radio-opt${val===v?" selected":""}"><input type="radio" name="${name}" value="${h(v)}"${val===v?" checked":""}>${h(l)}</label>`).join("")}</div>`;
 }
-function taHTML(id,val,ph,rows=3){
-  return`<textarea id="${id}" rows="${rows}" placeholder="${h(ph||"Record verbatim…")}">${h(val||"")}</textarea>`;
-}
-function tiHTML(id,val,ph){
-  return`<input type="text" id="${id}" value="${h(val||"")}" placeholder="${h(ph||"Type here…")}">`;
-}
+function taHTML(id,val,ph,rows=3){return`<textarea id="${id}" rows="${rows}" placeholder="${h(ph||"Record verbatim…")}">${h(val||"")}</textarea>`}
+function tiHTML(id,val,ph){return`<input type="text" id="${id}" value="${h(val||"")}" placeholder="${h(ph||"Type here…")}">`}
 function noteHTML(t){return`<div class="note">${h(t)}</div>`}
 function qtextHTML(q){return`<div class="qtext">"${h(q)}"</div>`}
-function qcardHTML(title,note,q,inner){
-  return`<div class="card"><div class="label">${h(title)}</div>${note?noteHTML(note):""}${q?qtextHTML(q):""}${inner}</div>`;
-}
+function qcardHTML(title,note,q,inner){return`<div class="card"><div class="label">${h(title)}</div>${note?noteHTML(note):""}${q?qtextHTML(q):""}${inner}</div>`}
 
 // ─── SECTION RENDERERS ────────────────────────────────────────────────────
 function secSnapshot(){
@@ -268,7 +382,6 @@ function secWishes(){
   qcardHTML("Q14 — Anything else? (optional)","Some workers will have nothing more to add. Others will share something that reframes the conversation. Do not prompt or suggest topics.","Is there anything else you want to say?",
     taHTML("q14.extra",cur.q14.extra,"",4));
 }
-
 const secFns=[secSnapshot,secOpening,secPayment,secWork,secTracking,secRecords,secWishes];
 
 // ─── RENDER ───────────────────────────────────────────────────────────────
@@ -277,30 +390,39 @@ function render(){
   if(view==="home")renderHome(app);
   else if(view==="interview")renderInterview(app);
   else if(view==="report")renderReport(app);
+  else if(view==="settings")renderSettings(app);
 }
 
 function renderHome(el){
   interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+  const unsynced=interviews.filter(iv=>!iv.synced).length;
+  const hasSheets=!!getSheetsURL();
+  const audioCount=audioKeys.length;
   el.innerHTML=`
-    <h2>Trusted Payments</h2>
-    <p style="margin:2px 0 20px;font-size:14px;color:var(--txt2)">Health worker interview guide · eGov Foundation</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><h2>Trusted Payments</h2>
+      <p style="margin:2px 0 20px;font-size:14px;color:var(--txt2)">Interview tool · eGov Foundation</p></div>
+      <button onclick="go('settings')" style="background:none;border:none;font-size:20px;padding:4px;color:var(--txt2)" title="Settings">⚙</button>
+    </div>
     <button class="btn btn-blue" onclick="startNew()" style="margin-bottom:10px">＋ New interview</button>
-    ${interviews.length?`<button class="btn btn-green" onclick="exportAll()" style="margin-bottom:24px;font-size:14px">⬇ Export all interviews (.json)</button>`:`<div style="margin-bottom:24px"></div>`}
-    <div class="label" style="letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Saved interviews (${interviews.length})</div>
+    ${hasSheets?`<button class="btn btn-purple" id="sync-btn" onclick="syncToSheets()" style="margin-bottom:10px;font-size:14px">☁ Sync to Google Sheets${unsynced?` (${unsynced} new)`:" (all synced ✓)"}</button>`:""}
+    ${interviews.length?`<button class="btn btn-green" onclick="exportAll()" style="margin-bottom:10px;font-size:14px">⬇ Export all (.json)</button>`:""}
+    ${audioCount?`<div style="background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--rl);padding:12px;margin-bottom:16px;font-size:13px;color:var(--amber)">🔒 ${audioCount} audio backup(s) saved in browser storage. Open each interview to download.</div>`:""}
+    <div class="label" style="letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px;margin-top:10px">Saved interviews (${interviews.length})</div>
     ${interviews.length===0?
       `<div style="text-align:center;padding:40px 0;color:var(--txt3)"><div style="font-size:32px;margin-bottom:8px">📋</div><span style="font-size:14px">No interviews yet — tap above to start</span></div>`:
       interviews.map(iv=>`<button class="iv-item" onclick="openIV('${iv.id}')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
           <span style="font-size:14px;font-weight:500">${h(iv.s0?.role||"Unnamed role")}</span>
-          <span class="badge ${iv.status==="done"?"badge-done":"badge-draft"}">${iv.status==="done"?"Complete":"In progress"}</span>
+          <div><span class="badge ${iv.status==="done"?"badge-done":"badge-draft"}">${iv.status==="done"?"Complete":"In progress"}</span>${iv.synced?'<span class="badge badge-synced">Synced</span>':""}</div>
         </div>
         <div style="font-size:13px;color:var(--txt2)">${h(iv.s0?.location||"—")} · ${h(iv.s0?.programme||"—")}</div>
-        <div style="font-size:12px;color:var(--txt3);margin-top:4px">${fmtDate(iv.startedAt)}</div>
+        <div style="font-size:12px;color:var(--txt3);margin-top:4px">${fmtDate(iv.startedAt)}${audioKeys.includes(iv.id)?" · 🎙 audio backed up":""}</div>
       </button>`).join("")}`;
 }
 
 function renderInterview(el){
-  // Audio consent + recording bar
+  const hasBackup=audioKeys.includes(cur?.id);
   let audioHTML="";
   if(consent===null){
     audioHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:var(--rl);padding:14px;margin-bottom:16px">
@@ -313,65 +435,128 @@ function renderInterview(el){
   }else if(consent===true){
     const bord=recording?`1.5px solid var(--red-bd)`:audioBlob?`1.5px solid var(--green-bd)`:`1px solid var(--bg3)`;
     const col=recording?"var(--red)":audioBlob?"var(--green)":"var(--txt2)";
-    const label=recording?`Recording — ${fmtDur(recSec)}`:audioBlob?`Recorded — ${fmtDur(recSec)}`:"Ready to record";
+    const label=recording?`Recording — ${fmtDur(recSec)}`:audioBlob?`✓ Recorded ${fmtDur(recSec)} — auto-saved`:"Ready to record";
     let btns="";
     if(!recording&&!audioBlob) btns=`<button class="btn-sm" style="background:var(--red-bg);border:1px solid var(--red-bd);color:var(--red)" onclick="startRec()">⏺ Record</button>`;
     else if(recording) btns=`<button class="btn-sm btn-gray" onclick="stopRec()">⏹ Stop</button>`;
-    else if(audioBlob&&!recording) btns=`<button class="btn-sm" style="background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green)" onclick="dlAudio()">⬇ Save audio</button>`;
+    else if(audioBlob&&!recording) btns=`<button class="btn-sm" style="background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green)" onclick="dlAudio()">⬇ Download again</button>`;
     audioHTML=`<div class="rec-box" style="background:var(--bg2);border:${bord}">
       <div style="display:flex;align-items:center;gap:8px">${recording?'<span class="rec-dot"></span>':""}<span style="font-size:13px;font-weight:500;color:${col}">${label}</span></div>
       <div style="display:flex;gap:6px;flex-shrink:0">${btns}</div></div>`;
+    if(hasBackup&&!audioBlob){
+      audioHTML+=`<div style="background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--amber);display:flex;justify-content:space-between;align-items:center">
+        <span>🔒 Audio backup available</span>
+        <button onclick="recoverAudio('${cur.id}')" style="background:var(--bg2);border:1px solid var(--amber-bd);border-radius:var(--r);padding:5px 10px;font-size:12px;color:var(--amber);cursor:pointer">Download</button>
+      </div>`;
+    }
   }else{
     audioHTML=`<div style="background:var(--bg3);border:1px solid var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--txt2)">✏️ No recording consent — capture written responses only</div>`;
   }
-
-  // Tabs
   const tabs=SECS.map((s,i)=>`<button class="tab${sec===i?" active":""}" onclick="sec=${i};render()">${i}. ${h(s)}</button>`).join("");
-
-  // Section content
   const content=secFns[sec]();
-
-  // Nav buttons
   let nav=`<div class="nav-row">`;
   if(sec>0) nav+=`<button class="nav-btn btn-gray" onclick="sec--;render()">← Prev</button>`;
   if(sec<SECS.length-1) nav+=`<button class="nav-btn btn-blue" style="flex:2" onclick="sec++;render()">Next →</button>`;
   else nav+=`<button class="nav-btn btn-green" style="flex:2" onclick="finishIV()">✓ Save &amp; finish</button>`;
   nav+=`</div>`;
-
   el.innerHTML=`
     <button class="back-btn" onclick="go('home')">← All interviews</button>
     <div class="tabs">${tabs}</div>
     ${audioHTML}
     <div id="sec-content">${content}</div>
     ${nav}`;
-
-  // Bind events
   bindInputs();
 }
 
 function renderReport(el){
-  const iv=cur;
-  const txt=buildReport(iv);
+  const iv=cur;const hasBackup=audioKeys.includes(iv?.id);
   el.innerHTML=`
     <button class="back-btn" onclick="go('home')">← All interviews</button>
     <h2>${h(iv.s0?.role||"Interview")}</h2>
     <p style="margin:2px 0 16px;font-size:13px;color:var(--txt2)">${fmtDate(iv.startedAt)}</p>
     <div class="grid2">
       ${[["Role",iv.s0?.role],["Location",iv.s0?.location],["Programme",iv.s0?.programme],["Pay wait",rl(iv.q3?.range)],["Employers",rl(iv.q2?.count)],["Work proof",rl(iv.q11?.proof)]].map(([k,v])=>
-        `<div class="grid2-cell"><div class="k">${h(k)}</div><div class="v">${h(v||"—")}</div></div>`
-      ).join("")}
+        `<div class="grid2-cell"><div class="k">${h(k)}</div><div class="v">${h(v||"—")}</div></div>`).join("")}
     </div>
+    ${hasBackup?`<div style="background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--amber);display:flex;justify-content:space-between;align-items:center">
+      <span>🎙 Audio backup available</span>
+      <button onclick="recoverAudio('${iv.id}')" style="background:var(--bg2);border:1px solid var(--amber-bd);border-radius:var(--r);padding:5px 10px;font-size:12px;color:var(--amber);cursor:pointer">Download</button>
+    </div>`:""}
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="btn-sm" style="background:var(--bg2);border:1px solid var(--bg3);color:var(--txt)" onclick="dlReport()">⬇ Download .txt</button>
       <button class="btn-sm" id="copy-btn" style="background:var(--bg2);border:1px solid var(--bg3);color:var(--txt)" onclick="copyReport()">📋 Copy text</button>
     </div>
     ${iv.status!=="done"?`<button class="btn btn-gray" style="margin-bottom:10px;font-size:13px" onclick="go('interview',0)">✏️ Continue filling interview</button>`:""}
-    <div class="card"><div class="label" style="margin-bottom:10px">Full record</div><pre class="report-pre">${h(txt)}</pre></div>`;
+    <div class="card"><div class="label" style="margin-bottom:10px">Full record</div><pre class="report-pre">${h(buildReport(iv))}</pre></div>`;
 }
+
+function renderSettings(el){
+  const url=getSheetsURL();
+  el.innerHTML=`
+    <button class="back-btn" onclick="go('home')">← Back</button>
+    <h2>Settings</h2>
+    <p style="margin:4px 0 20px;font-size:14px;color:var(--txt2)">Configure sync and data options</p>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">☁ Google Sheets sync</div>
+      <p style="font-size:12px;color:var(--txt2);margin-bottom:12px;line-height:1.6">
+        Paste the URL of your deployed Google Apps Script below. Each sync pushes new interviews as rows to your spreadsheet.
+      </p>
+      <div class="label">Apps Script URL</div>
+      <input type="url" id="sheets-url" value="${h(url)}" placeholder="https://script.google.com/macros/s/…/exec">
+      <button class="btn btn-blue" onclick="setSheetsURL(document.getElementById('sheets-url').value);toast('✓ URL saved')" style="margin-top:10px;font-size:14px">Save URL</button>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">📱 Setup guide</div>
+      <div style="font-size:13px;color:var(--txt2);line-height:1.8">
+        <strong>1.</strong> Open <a href="https://sheets.google.com" target="_blank" style="color:var(--blue)">Google Sheets</a> and create a new blank spreadsheet<br>
+        <strong>2.</strong> Go to <strong>Extensions → Apps Script</strong><br>
+        <strong>3.</strong> Delete any code and paste the script (see below)<br>
+        <strong>4.</strong> Click <strong>Deploy → New deployment</strong><br>
+        <strong>5.</strong> Type = <strong>Web app</strong>, access = <strong>Anyone</strong><br>
+        <strong>6.</strong> Click <strong>Deploy</strong>, authorise, copy the URL<br>
+        <strong>7.</strong> Paste URL above and hit Save
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">Apps Script code (copy this)</div>
+      <pre style="font-family:monospace;font-size:11px;background:var(--bg);padding:12px;border-radius:var(--r);overflow-x:auto;white-space:pre-wrap;line-height:1.6;color:var(--txt2)">${h(`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  var rows = data.rows;
+  if (!rows || rows.length === 0) return ContentService.createTextOutput(JSON.stringify({status:"empty"})).setMimeType(ContentService.MimeType.JSON);
+  // Add headers if sheet is empty
+  if (sheet.getLastRow() === 0) {
+    var headers = Object.keys(rows[0]);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+  }
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  rows.forEach(function(row) {
+    var vals = headers.map(function(h) { return row[h] || ""; });
+    sheet.appendRow(vals);
+  });
+  return ContentService.createTextOutput(JSON.stringify({status:"ok",added:rows.length})).setMimeType(ContentService.MimeType.JSON);
+}`)}</pre>
+      <button onclick="navigator.clipboard.writeText(document.querySelector('.card pre').textContent);toast('✓ Script copied')" class="btn btn-gray" style="margin-top:8px;font-size:13px">📋 Copy script</button>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">🔒 Audio backup</div>
+      <p style="font-size:12px;color:var(--txt2);line-height:1.6">Audio recordings are auto-downloaded when you stop recording AND backed up in your browser's IndexedDB storage. They survive tab closes and browser restarts. Currently <strong>${audioKeys.length}</strong> audio file(s) backed up.</p>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--txt)">📡 Offline mode</div>
+      <p style="font-size:12px;color:var(--txt2);line-height:1.6">Text data and radio selections are saved in localStorage — they work fully offline, no internet needed. Audio recording also works offline. Only the Google Sheets sync requires internet.</p>
+    </div>`;
+}
+
 function dlReport(){
   const blob=new Blob([buildReport(cur)],{type:"text/plain"});
-  const url=URL.createObjectURL(blob);const a=document.createElement("a");
-  a.href=url;a.download=`tp_interview_${cur.id}.txt`;a.click();URL.revokeObjectURL(url);
+  triggerDownload(blob,`tp_interview_${cur.id}.txt`);
 }
 function copyReport(){
   navigator.clipboard.writeText(buildReport(cur)).then(()=>{
@@ -381,15 +566,12 @@ function copyReport(){
 
 // ─── EVENT BINDING ────────────────────────────────────────────────────────
 function bindInputs(){
-  // Text inputs & textareas
   document.querySelectorAll("#sec-content textarea, #sec-content input[type=text]").forEach(el=>{
     el.addEventListener("input",()=>upd(el.id,el.value));
   });
-  // Radio buttons
   document.querySelectorAll("#sec-content input[type=radio]").forEach(el=>{
     el.addEventListener("change",()=>{
       upd(el.name,el.value);
-      // Update selected styling
       el.closest(".radio-group").querySelectorAll(".radio-opt").forEach(opt=>opt.classList.remove("selected"));
       el.closest(".radio-opt").classList.add("selected");
     });
@@ -398,7 +580,7 @@ function bindInputs(){
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
-render();
+openAudioDB().then(()=>getAllAudioKeys()).then(keys=>{audioKeys=keys;render()}).catch(()=>render());
 </script>
 </body>
 </html>
