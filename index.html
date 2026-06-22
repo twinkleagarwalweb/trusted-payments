@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Trusted Payments — Interview Tool</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f7f7f8;--bg2:#ffffff;--bg3:#ebebef;
+  --txt:#18181b;--txt2:#52525b;--txt3:#a1a1aa;
+  --blue:#1d4ed8;--blue-bg:#eff6ff;--blue-bd:#93c5fd;
+  --green:#166534;--green-bg:#f0fdf4;--green-bd:#86efac;
+  --amber:#92400e;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
+  --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --r:8px;--rl:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:480px;margin:0 auto;padding:16px}
+h2{font-size:18px;font-weight:600}
+button{font-family:var(--font);cursor:pointer}
+textarea,input[type=text]{font-family:var(--font);font-size:14px;color:var(--txt);width:100%;padding:10px 12px;border-radius:var(--r);border:1px solid var(--bg3);background:var(--bg2);outline:none;-webkit-appearance:none;resize:vertical}
+textarea:focus,input[type=text]:focus{border-color:var(--blue-bd)}
+textarea{line-height:1.6}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:var(--rl);font-size:15px;font-weight:500;border:none}
+.btn-blue{background:var(--blue-bg);border:1.5px solid var(--blue-bd);color:var(--blue)}
+.btn-green{background:var(--green-bg);border:1.5px solid var(--green-bd);color:var(--green)}
+.btn-gray{background:var(--bg3);border:1px solid var(--bg3);color:var(--txt2)}
+.btn-sm{padding:10px 14px;font-size:13px;width:auto;flex:1}
+
+.card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--rl);padding:16px;margin-bottom:12px}
+.label{font-size:12px;font-weight:500;color:var(--txt2);margin-bottom:4px}
+.note{background:var(--amber-bg);border:1px solid var(--amber-bd);border-radius:var(--r);padding:8px 10px;font-size:12px;color:var(--amber);line-height:1.5;margin-bottom:10px}
+.qtext{font-size:14px;color:var(--txt);font-style:italic;line-height:1.6;padding:8px 12px;margin-bottom:8px;background:var(--blue-bg);border-radius:var(--r);border-left:2px solid var(--blue-bd)}
+
+.radio-group{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.radio-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border:1px solid var(--bg3);border-radius:var(--r);font-size:13px;cursor:pointer}
+.radio-opt.selected{background:var(--blue-bg);border-color:var(--blue-bd)}
+.radio-opt input{width:15px;height:15px;flex-shrink:0;accent-color:var(--blue)}
+
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;margin-bottom:14px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:13px;background:var(--bg3);border:1px solid var(--bg3);color:var(--txt2);cursor:pointer;font-weight:400}
+.tab.active{background:var(--blue-bg);border-color:var(--blue-bd);color:var(--blue);font-weight:500}
+
+.iv-item{display:block;width:100%;background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--rl);padding:14px 16px;margin-bottom:8px;cursor:pointer;text-align:left}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;display:inline-block}
+.badge-done{background:var(--green-bg);color:var(--green)}
+.badge-draft{background:var(--amber-bg);color:var(--amber)}
+
+.nav-row{display:flex;gap:10px;margin-top:8px}
+.nav-btn{flex:1;padding:12px;border-radius:var(--r);font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px;border:none}
+
+.rec-box{border-radius:var(--rl);padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;animation:blink 1s step-end infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.grid2-cell{background:var(--bg3);border-radius:var(--r);padding:10px 12px}
+.grid2-cell .k{font-size:11px;font-weight:500;color:var(--txt3);text-transform:uppercase;letter-spacing:0.3px}
+.grid2-cell .v{font-size:13px;font-weight:500;color:var(--txt);margin-top:4px}
+
+.report-pre{font-family:'Courier New',Courier,monospace;font-size:11px;color:var(--txt);line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow-y:auto}
+
+.back-btn{background:none;border:none;color:var(--txt2);font-size:13px;padding:0 0 12px;display:flex;align-items:center;gap:4px}
+
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+// ─── STORAGE ──────────────────────────────────────────────────────────────
+function getAll(){
+  try{ const idx=JSON.parse(localStorage.getItem("tp_idx")||"[]"); return idx.map(id=>{try{return JSON.parse(localStorage.getItem("tp_"+id))}catch{return null}}).filter(Boolean) }catch{return[]}
+}
+function save(iv){
+  localStorage.setItem("tp_"+iv.id,JSON.stringify(iv));
+  let idx=[];try{idx=JSON.parse(localStorage.getItem("tp_idx")||"[]")}catch{}
+  if(!idx.includes(iv.id))idx.unshift(iv.id);
+  localStorage.setItem("tp_idx",JSON.stringify(idx));
+}
+function newIV(){
+  return{id:""+Date.now(),startedAt:new Date().toISOString(),completedAt:null,status:"draft",audioRef:"",
+    s0:{role:"",programme:"",org:"",location:"",age:"",exp:"",notes:""},
+    q1:{types:""},q2:{count:"",names:""},q3:{range:"",exact:""},q4:{impact:""},q5:{result:"",details:""},
+    q6:{days:"",details:""},q7:{gaps:"",management:""},q8:{method:""},q9:{knowledge:"",mismatch:""},
+    q10:{resubmit:"",what:""},q11:{proof:"",desc:""},q12:{wish:""},q13:{useful:"",reason:""},q14:{extra:""}}
+}
+
+const RL={"<1w":"Within 1 week","1-2w":"1–2 weeks","2-4w":"2–4 weeks","1-3m":"1–3 months",">3m":">3 months","none":"Not received","<10":"<10 days","10-20":"10–20 days","21-40":"21–40 days","41-60":"41–60 days",">60":">60 days","1":"1 employer","2-3":"2–3 employers","4+":"4+ employers","unsure":"Unsure","rare":"Rare — usually have work","short":"Short (<1 month)","common":"Common, can last months","supplement":"Not main income","under25":"Under 25","25-35":"25–35","36-45":"36–45","above45":"Above 45","<1":"<1 year","1-3":"1–3 years","3-5":"3–5 years",">5":">5 years","yes":"Yes","no":"No","cant-recall":"Can't recall","always":"Always from scratch","sometimes":"Sometimes","no-r":"No, already there","unsure-r":"Unsure","knew-matched":"Knew in advance, matched","rough":"Had rough idea","didnt-know":"Did not know","different":"Was different","paper":"Paper or card","phone":"On phone","nothing":"Nothing","unsure-p":"Unsure","very":"Very useful","somewhat":"Somewhat useful","unsure-u":"Not sure","no-need":"Not needed"};
+const rl=v=>RL[v]||v||"—";
+const SECS=["Snapshot","Opening","Payment","Work","Tracking","Records","Wishes"];
+
+function fmtDate(iso){return iso?new Date(iso).toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}
+function fmtDur(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let view="home", interviews=[], cur=null, sec=0, consent=null;
+let recording=false, recSec=0, audioBlob=null, audioExt="webm";
+let mr=null, chunks=[], recTimer=null, saveTimer=null;
+
+function go(v,s){view=v; if(typeof s==="number")sec=s; render();}
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────
+async function startRec(){
+  if(typeof MediaRecorder==="undefined"){alert("Audio recording not available in this browser.");return}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    chunks=[];
+    const types=["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg",""];
+    let mime="";for(const t of types){if(t===""||MediaRecorder.isTypeSupported(t)){mime=t;break}}
+    mr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+    mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data)};
+    mr.onstop=()=>{
+      audioExt=mime.includes("mp4")?"m4a":mime.includes("ogg")?"ogg":"webm";
+      audioBlob=new Blob(chunks,{type:mime||"audio/webm"});
+      stream.getTracks().forEach(t=>t.stop());
+      render();
+    };
+    mr.start(1000);recording=true;recSec=0;
+    recTimer=setInterval(()=>{recSec++;render()},1000);
+    render();
+  }catch(e){
+    if(e.name==="NotAllowedError")alert("Microphone access denied. Check browser settings and allow microphone for this site.");
+    else alert("Mic error: "+e.message);
+  }
+}
+function stopRec(){if(mr)mr.stop();recording=false;clearInterval(recTimer);render();}
+function dlAudio(){
+  if(!audioBlob)return;
+  const url=URL.createObjectURL(audioBlob);const a=document.createElement("a");
+  a.href=url;a.download=`interview_${cur?.id||"audio"}.${audioExt}`;a.click();URL.revokeObjectURL(url);
+}
+
+// ─── ACTIONS ──────────────────────────────────────────────────────────────
+function startNew(){
+  cur=newIV();sec=0;consent=null;recording=false;recSec=0;audioBlob=null;
+  save(cur);interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+  go("interview",0);
+}
+function openIV(id){
+  cur=JSON.parse(localStorage.getItem("tp_"+id));sec=0;consent=null;audioBlob=null;recording=false;
+  go(cur.status==="done"?"report":"interview",0);
+}
+function finishIV(){
+  cur.completedAt=new Date().toISOString();cur.status="done";
+  save(cur);interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+  go("report");
+}
+function upd(path,val){
+  if(path.includes(".")){const[s,f]=path.split(".");cur[s][f]=val}else{cur[path]=val}
+  clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(cur),800);
+}
+function exportAll(){
+  const data={exportedAt:new Date().toISOString(),project:"Trusted Payments — eGov Foundation",total:interviews.length,
+    interviews:interviews.map(iv=>({...iv,_labels:{payWait:rl(iv.q3?.range),employers:rl(iv.q2?.count),workDays:rl(iv.q6?.days),gaps:rl(iv.q7?.gaps),expectedVsActual:rl(iv.q9?.knowledge),reReg:rl(iv.q10?.resubmit),proof:rl(iv.q11?.proof),portable:rl(iv.q13?.useful),failure:rl(iv.q5?.result),age:rl(iv.s0?.age),exp:rl(iv.s0?.exp)}}))};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");
+  a.href=url;a.download=`tp_export_${Date.now()}.json`;a.click();URL.revokeObjectURL(url);
+}
+
+// ─── REPORT BUILDER ───────────────────────────────────────────────────────
+function buildReport(iv){
+  const s=iv.s0,hr="─".repeat(50),eq="═".repeat(50);
+  return[
+    "TRUSTED PAYMENTS — INTERVIEW RECORD","eGov Foundation · FOR INTERNAL USE ONLY",eq,"",
+    `Interview ID:   ${iv.id}`,`Started:        ${fmtDate(iv.startedAt)}`,`Completed:      ${fmtDate(iv.completedAt)}`,`Status:         ${iv.status.toUpperCase()}`,`Audio ref:      ${iv.audioRef||"—"}`,
+    "",hr,"SECTION 0 — WORKER SNAPSHOT",hr,
+    `Role:           ${s.role||"—"}`,`Programme:      ${s.programme||"—"}`,`Organisation:   ${s.org||"—"}`,`Location:       ${s.location||"—"}`,`Age group:      ${rl(s.age)}`,`Experience:     ${rl(s.exp)}`,`Notes:          ${s.notes||"—"}`,
+    "",hr,"SECTION 1 — OPENING",hr,
+    "Q1 — Types of work described:",iv.q1.types||"  (not recorded)","",
+    `Q2 — Number of employers: ${rl(iv.q2.count)}`,"Names:",iv.q2.names||"  (not recorded)",
+    "",hr,"SECTION 2 — PAYMENT EXPERIENCE",hr,
+    `Q3 — Time to receive payment: ${rl(iv.q3.range)}`,"Exact figure confirmed:",iv.q3.exact||"  (not recorded)","",
+    "Q4 — Impact of waiting:",iv.q4.impact||"  (not recorded)","",
+    `Q5 — Payment shortfall / failure: ${rl(iv.q5.result)}`,"Details:",iv.q5.details||"  (not recorded)",
+    "",hr,"SECTION 3 — WORK VOLUME & CONTINUITY",hr,
+    `Q6 — Paid days last 3 months: ${rl(iv.q6.days)}`,"Breakdown:",iv.q6.details||"  (not recorded)","",
+    `Q7 — Gaps between work: ${rl(iv.q7.gaps)}`,"How they manage:",iv.q7.management||"  (not recorded)",
+    "",hr,"SECTION 4 — TRACKING WORK & RECORDS",hr,
+    "Q8 — Tracking method:",iv.q8.method||"  (not recorded)","",
+    `Q9 — Expected vs actual payment: ${rl(iv.q9.knowledge)}`,"Mismatch details:",iv.q9.mismatch||"  (not recorded)","",
+    `Q10 — Re-registration burden: ${rl(iv.q10.resubmit)}`,"What must be re-submitted:",iv.q10.what||"  (not recorded)",
+    "",hr,"SECTION 5 — RECORDS & PORTABILITY",hr,
+    `Q11 — Portable proof of work: ${rl(iv.q11.proof)}`,"Description:",iv.q11.desc||"  (not recorded)",
+    "",hr,"SECTION 6 — REFLECTIVE & WISHFUL",hr,
+    "Q12 — If payment arrived within 1 week:",iv.q12.wish||"  (not recorded)","",
+    `Q13 — Portable work history usefulness: ${rl(iv.q13.useful)}`,"Reason:",iv.q13.reason||"  (not recorded)","",
+    "Q14 — Additional remarks:",iv.q14.extra||"  (none)","",eq,"END OF RECORD"
+  ].join("\n");
+}
+
+// ─── HTML BUILDERS ────────────────────────────────────────────────────────
+const h=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function radioHTML(name,opts,val){
+  return`<div class="radio-group">${opts.map(([v,l])=>
+    `<label class="radio-opt${val===v?" selected":""}"><input type="radio" name="${name}" value="${h(v)}"${val===v?" checked":""}>${h(l)}</label>`
+  ).join("")}</div>`;
+}
+function taHTML(id,val,ph,rows=3){
+  return`<textarea id="${id}" rows="${rows}" placeholder="${h(ph||"Record verbatim…")}">${h(val||"")}</textarea>`;
+}
+function tiHTML(id,val,ph){
+  return`<input type="text" id="${id}" value="${h(val||"")}" placeholder="${h(ph||"Type here…")}">`;
+}
+function noteHTML(t){return`<div class="note">${h(t)}</div>`}
+function qtextHTML(q){return`<div class="qtext">"${h(q)}"</div>`}
+function qcardHTML(title,note,q,inner){
+  return`<div class="card"><div class="label">${h(title)}</div>${note?noteHTML(note):""}${q?qtextHTML(q):""}${inner}</div>`;
+}
+
+// ─── SECTION RENDERERS ────────────────────────────────────────────────────
+function secSnapshot(){
+  const d=cur.s0;
+  return`<p style="font-size:12px;color:var(--txt3);font-style:italic;margin-bottom:12px">Observational — do not read aloud as questions.</p>
+  <div class="card"><div class="label" style="margin-bottom:12px">Role & context</div>
+  ${[["role","Role in campaign","e.g. vaccinator, community mobiliser"],["programme","Programme / campaign name","Programme name"],["org","Organisation","Organisation name"],["location","Location (district / region)","District or region"]].map(([f,l,p])=>`<div style="margin-bottom:10px"><div class="label">${h(l)}</div>${tiHTML("s0."+f,d[f],p)}</div>`).join("")}
+  </div>
+  <div class="card"><div class="label" style="margin-bottom:12px">Worker profile <span style="font-weight:400;color:var(--txt3)">(optional — only if volunteered)</span></div>
+  <div style="margin-bottom:14px"><div class="label">Approximate age group</div>${radioHTML("s0.age",[["under25","Under 25"],["25-35","25–35"],["36-45","36–45"],["above45","Above 45"]],d.age)}</div>
+  <div style="margin-bottom:14px"><div class="label">Years in health campaigns</div>${radioHTML("s0.exp",[["<1","< 1 year"],["1-3","1–3 years"],["3-5","3–5 years"],[">5","> 5 years"]],d.exp)}</div>
+  <div><div class="label">Any other context to note</div>${taHTML("s0.notes",d.notes,"",2)}</div></div>`;
+}
+function secOpening(){
+  return qcardHTML("Q1 — Livelihood overview","Listen for the full picture. Do not redirect toward health work. Note all work — paid or unpaid, formal or informal.","Can you tell me about the different kinds of work you do or have done to support yourself and your family? It does not have to be only health work.",
+    `<div class="label">Types of work mentioned (list each)</div>${taHTML("q1.types",cur.q1.types,"",4)}`)+
+  qcardHTML("Q2 — Paid work & employer count","Surfaces paid/unpaid distinction and how many employers. If they struggle to count, ask them to name each one — counting is your job.","Among all the work you just described — which gets paid, and which does not? And for the paid work, how many different people or programs have you worked for in the last two to three years?",
+    `<div class="label">Number of employers / programmes</div>${radioHTML("q2.count",[["1","1 employer / programme"],["2-3","2–3 employers / programmes"],["4+","4 or more employers / programmes"],["unsure","Cannot recall / unsure"]],cur.q2.count)}<div style="margin-top:12px"><div class="label">Names of employers or programmes mentioned</div>${taHTML("q2.names",cur.q2.names,"",2)}</div>`);
+}
+function secPayment(){
+  return qcardHTML("Q3 — Payment waiting time","Most important quantitative question — do not skip it. If they cannot name a number, offer the ranges below.","Think about the last time you were waiting for payment after finishing your work. How many days did it take from the day you finished to the day the money reached you?",
+    `${radioHTML("q3.range",[["<1w","Within 1 week (up to 7 days)"],["1-2w","1–2 weeks"],["2-4w","2–4 weeks"],["1-3m","1–3 months"],[">3m","More than 3 months"],["none","Payment did not arrive / still waiting"]],cur.q3.range)}<div style="margin-top:12px"><div class="label">Exact figure or range confirmed (their words)</div>${taHTML("q3.exact",cur.q3.exact,"",2)}</div>`)+
+  qcardHTML("Q4 — Waiting period impact","Let the worker describe the impact in their own terms. Do not introduce the word 'borrow'. If they describe a financial consequence, follow up gently: 'And how did you manage that?'","While you were waiting for that payment — what was that time like for you? Did it affect anything at home or in your day-to-day life?",
+    taHTML("q4.impact",cur.q4.impact,"",4))+
+  qcardHTML("Q5 — Payment failures","If yes, follow up: 'Were you able to get it resolved? How long did that take?'","Has it ever happened that a payment was less than what you expected — or did not arrive at all? What did you do in that situation?",
+    `${radioHTML("q5.result",[["yes","Yes — payment was short or missing"],["no","No — payments have always arrived in full"],["cant-recall","Cannot recall"]],cur.q5.result)}<div style="margin-top:12px"><div class="label">If yes — what happened and how was it resolved</div>${taHTML("q5.details",cur.q5.details,"",3)}</div>`);
+}
+function secWork(){
+  return qcardHTML("Q6 — Work volume (last 3 months)","Total paid working days across all engagements. Prompt: 'Think about each programme separately — how many days for each?' Then add up.","In the last three months, roughly how many days did you actually work and get paid for it — across all the programmes or jobs you did?",
+    `${radioHTML("q6.days",[["<10","Fewer than 10 days"],["10-20","10–20 days"],["21-40","21–40 days"],["41-60","41–60 days"],[">60","More than 60 days"],["unsure","Not sure"]],cur.q6.days)}<div style="margin-top:12px"><div class="label">Individual programme figures and total</div>${taHTML("q6.details",cur.q6.details,"",2)}</div>`)+
+  qcardHTML("Q7 — Gaps between work","Probing continuity of income — primary livelihood or supplement. Note whether gaps are predictable (seasonal) or unpredictable.","Between jobs are there long gaps when you have no paid work? How do you usually manage during those gaps? How do you come to know about new opportunities?",
+    `${radioHTML("q7.gaps",[["rare","Gaps are rare — I usually have work"],["short","Gaps happen but are short (less than a month)"],["common","Gaps are common and can last months"],["supplement","This is not my main income — I have other work"]],cur.q7.gaps)}<div style="margin-top:12px"><div class="label">How they describe managing the gap</div>${taHTML("q7.management",cur.q7.management,"",3)}</div>`);
+}
+function secTracking(){
+  return qcardHTML("Q8 — Tracking method","Do not suggest options — let them describe first (paper register, phone tally, WhatsApp, payslip, or nothing at all).","When you finish work on a campaign, how do you know how much you are going to be paid? How does the supervisor or manager keep track of what you have done?",
+    `<div class="label">Method they describe (their words)</div>${taHTML("q8.method",cur.q8.method,"",4)}`)+
+  qcardHTML("Q9 — Expected vs actual payment","If there was a mismatch, ask: 'Do you know why it was different?'","Think about the last two or three jobs you worked in. Did you know, before the payment arrived, exactly how much you would receive? Did it match what you expected?",
+    `${radioHTML("q9.knowledge",[["knew-matched","Yes — I knew in advance and it matched"],["rough","I had a rough idea but was not sure of the exact amount"],["didnt-know","I did not know in advance — I waited to see"],["different","The amount was different from what I expected"]],cur.q9.knowledge)}<div style="margin-top:12px"><div class="label">If mismatch — what caused it (their words)</div>${taHTML("q9.mismatch",cur.q9.mismatch,"",3)}</div>`)+
+  qcardHTML("Q10 — Re-registration burden","Note specifically: did they provide documents already submitted elsewhere? How many times? Is any information carried forward automatically?","When you start a new job with an existing organization, do you have to re-submit your details — ID, bank account, phone number — even if you have done it before with the same organisation or a similar one?",
+    `${radioHTML("q10.resubmit",[["always","Yes — always start from scratch"],["sometimes","Sometimes — depends on the programme"],["no-r","No — my details are usually already there"],["unsure-r","Not sure how it works"]],cur.q10.resubmit)}<div style="margin-top:12px"><div class="label">What they have to re-submit (list)</div>${taHTML("q10.what",cur.q10.what,"",2)}</div>`);
+}
+function secRecords(){
+  return qcardHTML("Q11 — Portable proof of work","Most will say no. If yes, ask what it is — payslip, letter, WhatsApp message — and how reliable it feels to them.","Do you have something with you — a paper, a card, a message on your phone — that shows the work you have done in previous programs? Something you could show a new supervisor or employer?",
+    `${radioHTML("q11.proof",[["paper","Yes — I have a paper or card"],["phone","Yes — I have something on my phone"],["nothing","No — I have nothing like that"],["unsure-p","I am not sure"]],cur.q11.proof)}<div style="margin-top:12px"><div class="label">If yes — describe what it is</div>${taHTML("q11.desc",cur.q11.desc,"",2)}</div>`);
+}
+function secWishes(){
+  return qcardHTML("Q12 — Timely payment wish","Open, imagined question. Listen for what timely payment would mean: financial security, ability to plan, staying in the job, self-respect. Record verbatim.","If you imagine a world where complete payment arrived within a week of finishing your work — every time — what would change for you and your family?",
+    `<div class="label">Their words (verbatim where possible)</div>${taHTML("q12.wish",cur.q12.wish,"",5)}`)+
+  qcardHTML("Q13 — Portable work history","You are not explaining a product — you are hearing whether this is a felt need. If they say it would not be useful, that is important data too.","If all your work history — every job, every campaign — could be stored somewhere safe with you, without you having to explain or prove it again, would that be useful to you? Why or why not?",
+    `${radioHTML("q13.useful",[["very","Yes — very useful"],["somewhat","Somewhat useful"],["unsure-u","Not sure"],["no-need","No — not something I would need"]],cur.q13.useful)}<div style="margin-top:12px"><div class="label">Reason given in their words</div>${taHTML("q13.reason",cur.q13.reason,"",3)}</div>`)+
+  qcardHTML("Q14 — Anything else? (optional)","Some workers will have nothing more to add. Others will share something that reframes the conversation. Do not prompt or suggest topics.","Is there anything else you want to say?",
+    taHTML("q14.extra",cur.q14.extra,"",4));
+}
+
+const secFns=[secSnapshot,secOpening,secPayment,secWork,secTracking,secRecords,secWishes];
+
+// ─── RENDER ───────────────────────────────────────────────────────────────
+function render(){
+  const app=document.getElementById("app");
+  if(view==="home")renderHome(app);
+  else if(view==="interview")renderInterview(app);
+  else if(view==="report")renderReport(app);
+}
+
+function renderHome(el){
+  interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+  el.innerHTML=`
+    <h2>Trusted Payments</h2>
+    <p style="margin:2px 0 20px;font-size:14px;color:var(--txt2)">Health worker interview guide · eGov Foundation</p>
+    <button class="btn btn-blue" onclick="startNew()" style="margin-bottom:10px">＋ New interview</button>
+    ${interviews.length?`<button class="btn btn-green" onclick="exportAll()" style="margin-bottom:24px;font-size:14px">⬇ Export all interviews (.json)</button>`:`<div style="margin-bottom:24px"></div>`}
+    <div class="label" style="letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Saved interviews (${interviews.length})</div>
+    ${interviews.length===0?
+      `<div style="text-align:center;padding:40px 0;color:var(--txt3)"><div style="font-size:32px;margin-bottom:8px">📋</div><span style="font-size:14px">No interviews yet — tap above to start</span></div>`:
+      interviews.map(iv=>`<button class="iv-item" onclick="openIV('${iv.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+          <span style="font-size:14px;font-weight:500">${h(iv.s0?.role||"Unnamed role")}</span>
+          <span class="badge ${iv.status==="done"?"badge-done":"badge-draft"}">${iv.status==="done"?"Complete":"In progress"}</span>
+        </div>
+        <div style="font-size:13px;color:var(--txt2)">${h(iv.s0?.location||"—")} · ${h(iv.s0?.programme||"—")}</div>
+        <div style="font-size:12px;color:var(--txt3);margin-top:4px">${fmtDate(iv.startedAt)}</div>
+      </button>`).join("")}`;
+}
+
+function renderInterview(el){
+  // Audio consent + recording bar
+  let audioHTML="";
+  if(consent===null){
+    audioHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:var(--rl);padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:500;color:var(--blue);margin-bottom:8px">🎙 Ask the worker about audio recording</div>
+      <p style="font-size:13px;color:var(--blue);margin:0 0 12px;line-height:1.5;font-style:italic">"We would like to record this conversation so we do not miss anything. Is that all right with you? You can say no."</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm btn-blue" onclick="consent=true;render()">✓ Consent given</button>
+        <button class="btn-sm btn-gray" onclick="consent=false;render()">✕ No consent</button>
+      </div></div>`;
+  }else if(consent===true){
+    const bord=recording?`1.5px solid var(--red-bd)`:audioBlob?`1.5px solid var(--green-bd)`:`1px solid var(--bg3)`;
+    const col=recording?"var(--red)":audioBlob?"var(--green)":"var(--txt2)";
+    const label=recording?`Recording — ${fmtDur(recSec)}`:audioBlob?`Recorded — ${fmtDur(recSec)}`:"Ready to record";
+    let btns="";
+    if(!recording&&!audioBlob) btns=`<button class="btn-sm" style="background:var(--red-bg);border:1px solid var(--red-bd);color:var(--red)" onclick="startRec()">⏺ Record</button>`;
+    else if(recording) btns=`<button class="btn-sm btn-gray" onclick="stopRec()">⏹ Stop</button>`;
+    else if(audioBlob&&!recording) btns=`<button class="btn-sm" style="background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green)" onclick="dlAudio()">⬇ Save audio</button>`;
+    audioHTML=`<div class="rec-box" style="background:var(--bg2);border:${bord}">
+      <div style="display:flex;align-items:center;gap:8px">${recording?'<span class="rec-dot"></span>':""}<span style="font-size:13px;font-weight:500;color:${col}">${label}</span></div>
+      <div style="display:flex;gap:6px;flex-shrink:0">${btns}</div></div>`;
+  }else{
+    audioHTML=`<div style="background:var(--bg3);border:1px solid var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--txt2)">✏️ No recording consent — capture written responses only</div>`;
+  }
+
+  // Tabs
+  const tabs=SECS.map((s,i)=>`<button class="tab${sec===i?" active":""}" onclick="sec=${i};render()">${i}. ${h(s)}</button>`).join("");
+
+  // Section content
+  const content=secFns[sec]();
+
+  // Nav buttons
+  let nav=`<div class="nav-row">`;
+  if(sec>0) nav+=`<button class="nav-btn btn-gray" onclick="sec--;render()">← Prev</button>`;
+  if(sec<SECS.length-1) nav+=`<button class="nav-btn btn-blue" style="flex:2" onclick="sec++;render()">Next →</button>`;
+  else nav+=`<button class="nav-btn btn-green" style="flex:2" onclick="finishIV()">✓ Save &amp; finish</button>`;
+  nav+=`</div>`;
+
+  el.innerHTML=`
+    <button class="back-btn" onclick="go('home')">← All interviews</button>
+    <div class="tabs">${tabs}</div>
+    ${audioHTML}
+    <div id="sec-content">${content}</div>
+    ${nav}`;
+
+  // Bind events
+  bindInputs();
+}
+
+function renderReport(el){
+  const iv=cur;
+  const txt=buildReport(iv);
+  el.innerHTML=`
+    <button class="back-btn" onclick="go('home')">← All interviews</button>
+    <h2>${h(iv.s0?.role||"Interview")}</h2>
+    <p style="margin:2px 0 16px;font-size:13px;color:var(--txt2)">${fmtDate(iv.startedAt)}</p>
+    <div class="grid2">
+      ${[["Role",iv.s0?.role],["Location",iv.s0?.location],["Programme",iv.s0?.programme],["Pay wait",rl(iv.q3?.range)],["Employers",rl(iv.q2?.count)],["Work proof",rl(iv.q11?.proof)]].map(([k,v])=>
+        `<div class="grid2-cell"><div class="k">${h(k)}</div><div class="v">${h(v||"—")}</div></div>`
+      ).join("")}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn-sm" style="background:var(--bg2);border:1px solid var(--bg3);color:var(--txt)" onclick="dlReport()">⬇ Download .txt</button>
+      <button class="btn-sm" id="copy-btn" style="background:var(--bg2);border:1px solid var(--bg3);color:var(--txt)" onclick="copyReport()">📋 Copy text</button>
+    </div>
+    ${iv.status!=="done"?`<button class="btn btn-gray" style="margin-bottom:10px;font-size:13px" onclick="go('interview',0)">✏️ Continue filling interview</button>`:""}
+    <div class="card"><div class="label" style="margin-bottom:10px">Full record</div><pre class="report-pre">${h(txt)}</pre></div>`;
+}
+function dlReport(){
+  const blob=new Blob([buildReport(cur)],{type:"text/plain"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");
+  a.href=url;a.download=`tp_interview_${cur.id}.txt`;a.click();URL.revokeObjectURL(url);
+}
+function copyReport(){
+  navigator.clipboard.writeText(buildReport(cur)).then(()=>{
+    const b=document.getElementById("copy-btn");if(b){b.textContent="✓ Copied";setTimeout(()=>{b.textContent="📋 Copy text"},2000)}
+  }).catch(()=>{});
+}
+
+// ─── EVENT BINDING ────────────────────────────────────────────────────────
+function bindInputs(){
+  // Text inputs & textareas
+  document.querySelectorAll("#sec-content textarea, #sec-content input[type=text]").forEach(el=>{
+    el.addEventListener("input",()=>upd(el.id,el.value));
+  });
+  // Radio buttons
+  document.querySelectorAll("#sec-content input[type=radio]").forEach(el=>{
+    el.addEventListener("change",()=>{
+      upd(el.name,el.value);
+      // Update selected styling
+      el.closest(".radio-group").querySelectorAll(".radio-opt").forEach(opt=>opt.classList.remove("selected"));
+      el.closest(".radio-opt").classList.add("selected");
+    });
+  });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────
+interviews=getAll().sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+render();
+</script>
+</body>
+</html>
